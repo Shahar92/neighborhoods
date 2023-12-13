@@ -18,13 +18,12 @@ import (
 //
 // Parameters:
 //   - ageRange: Filter neighborhoods by age range. Format: "minAge,maxAge".
-//   - distance: Filter neighborhoods by maximum distance from the city center in kilometers.
-//   - sortBy: Sort neighborhoods by a specific field. Possible values: "name", "average_age", "distance_from_city_center", "average_income".
-//   - order: Sort order. Possible values: "asc" (ascending) or "desc" (descending).
+//   - maxDistance: Filter neighborhoods by maximum distance from the city center in kilometers.
+//   - sortBy: Sort neighborhoods by a specific field. Possible values: "name", "average_age", "distance_from_city_center", "average_income" , etc...
 //
 // Example Request:
 //
-//	GET /neighborhoods?ageRange=20,40&distance=10&sortBy=name,asc
+//	GET /neighborhoods?ageRange=20,40&maxDistance=10&sortBy=name,asc
 //
 // Example Response:
 //
@@ -103,9 +102,14 @@ func createNeighborhoodsQueryFromParams(params url.Values) (string, error) {
 	// Sorting
 	if sortBy != "" {
 		sortByValues := strings.Split(sortBy, ",")
-		if len(sortByValues) != 2 {
+		if len(sortByValues) != 2 || !isExists([]string{"asc", "desc"}, strings.ToLower(sortByValues[1])) {
 			return "", errors.New("invalid age sortBy format, should contain 2 params: field, order_direction(ASC/DESC)")
 		}
+		cols := []string{"name", "city", "state", "average_age", "distance_from_city_center", "average_income", "public_transport_availability", "latitude", "longitude"}
+		if !isExists(cols, sortByValues[0]) {
+			return "", fmt.Errorf("invalid field relevant ones can be: [%s]", strings.Join(cols, ","))
+		}
+
 		sqlQuery += fmt.Sprintf(" ORDER BY %s %s", sortByValues[0], sortByValues[1])
 	}
 

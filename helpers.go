@@ -22,3 +22,12 @@ func ReadNeighborhoodsFromFile(filePath string) ([]Neighborhood, error) {
 
 	return neighborhoods, nil
 }
+
+func isExists(arr []string, item string) bool {
+	for _, value := range arr {
+		if value == item {
+			return true
+		}
+	}
+	return false
+}

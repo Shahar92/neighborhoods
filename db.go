@@ -3,7 +3,6 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -26,16 +25,70 @@ func ConnectDB() (*sql.DB, error) {
 	return sql.Open("postgres", connStr)
 }
 
-func initDB() error {
-	// Check if there are already records in the neighborhoods table
-	hasRecords, err := HasRecordsInNeighborhoods()
+// doesTableExist checks if a table with the given name exists in the database
+func doesTableExist(tableName string) (bool, error) {
+	var exists bool
+	query := `
+		SELECT EXISTS (
+			SELECT 1
+			FROM   information_schema.tables
+			WHERE  table_name = $1
+		)
+	`
+
+	err := db.QueryRow(query, tableName).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
+}
+
+func buildNeighborhoodTable() error {
+	_, err := db.Exec(`
+		CREATE TABLE neighborhoods (
+			ID SERIAL PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			city VARCHAR(255) NOT NULL,
+			state VARCHAR(255),
+			average_age INTEGER NOT NULL,
+			distance_from_city_center FLOAT NOT NULL,
+			average_income INTEGER NOT NULL,
+			public_transport_availability VARCHAR(255) NOT NULL,
+			latitude DOUBLE PRECISION NOT NULL,
+			longitude DOUBLE PRECISION NOT NULL
+		);
+	`)
+
 	if err != nil {
 		return err
 	}
 
-	// If there are records, return an error or handle it as needed
-	if hasRecords {
-		return errors.New("neighborhoods table already has records")
+	// Add indexes to improve query performance
+	_, err = db.Exec(`
+		CREATE INDEX idx_average_age ON neighborhoods (average_age);
+		CREATE INDEX idx_distance_from_city_center ON neighborhoods (distance_from_city_center);
+		CREATE INDEX idx_average_income ON neighborhoods (average_income);
+		CREATE INDEX idx_latitude_longitude ON neighborhoods (latitude, longitude);
+	`)
+
+	return err
+}
+
+func initDB() error {
+
+	// Check if the neighborhoods table exists
+	tableExists, err := doesTableExist("neighborhoods")
+	if err != nil {
+		return err
+	}
+
+	if tableExists {
+		return nil
+	}
+
+	if err = buildNeighborhoodTable(); err != nil {
+		return err
 	}
 
 	neighborhoods, err := ReadNeighborhoodsFromFile("./neighborhoods_data.json")
@@ -133,36 +186,3 @@ func QueryNeighborhoods(sqlQuery string) ([]Neighborhood, error) {
 
 	return neighborhoods, nil
 }
-
-// HasRecordsInNeighborhoods checks if there is at least one record in the neighborhoods table
-func HasRecordsInNeighborhoods() (bool, error) {
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM neighborhoods").Scan(&count)
-	if err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
-// func InsertNeighborhood(neighborhood Neighborhood) error {
-// 	query := `
-// 		INSERT INTO neighborhoods (
-// 			name, city, state, average_age, distance_from_city_center, average_income,
-// 			public_transport_availability, latitude, longitude
-// 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-// 	`
-
-// 	_, err := db.Exec(query,
-// 		neighborhood.Name,
-// 		neighborhood.City,
-// 		neighborhood.State,
-// 		neighborhood.AverageAge,
-// 		neighborhood.DistanceFromCityCenter,
-// 		neighborhood.AverageIncome,
-// 		neighborhood.PublicTransportAvailability,
-// 		neighborhood.Latitude,
-// 		neighborhood.Longitude,
-// 	)
-
-// 	return err
-// }
